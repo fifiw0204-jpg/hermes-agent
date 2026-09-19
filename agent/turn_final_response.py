@@ -170,6 +170,8 @@ def finish_text_response(
     # After at least one chitchat exchange, check whether the conversation has
     # revealed task-like intent. If so, inject the confirmation prompt.
     # The 'yes' confirmation is handled by inline_tool_executors.py.
+    # Non-chitchat (task-worthy) messages are flagged direct_register=True so
+    # the caller can trigger kanban registration without the confirmation cascade.
     from agent.chitchat_kanban_flow import chitchat_kanban_check
 
     _ckv = chitchat_kanban_check(
@@ -180,6 +182,20 @@ def finish_text_response(
     )
     if _ckv.prompt_requested:
         final_response = _ckv.inject_confirmation(final_response)
+    elif _ckv.direct_register:
+        # Non-chitchat task-worthy message: store the original user text on
+        # the agent so the direct_kanban_create executor can use it as the
+        # task body, then call the direct-create inline executor.
+        from agent.inline_tool_executors import _direct_kanban_create, InlineToolContext
+        agent._last_direct_register_message = (user_message or "").strip()
+        _direct_result = _direct_kanban_create(
+            agent, {}, InlineToolContext(effective_task_id="")
+        )
+        logger.info(
+            "Chitchat kanban: direct_register=True for user message "
+            "— kanban task created (result=%s)",
+            str(_direct_result)[:100],
+        )
 
     final_msg = agent._build_assistant_message(assistant_message, finish_reason)
 

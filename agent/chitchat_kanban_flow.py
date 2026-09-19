@@ -79,6 +79,11 @@ class ChitchatKanbanVerdict:
     # a prompt is shown, so the same intent is not prompted again.
     intent_hash: str | None = None
 
+    # True when the user message is task-worthy (non-chitchat) and should be
+    # registered in kanban directly without the chitchat-confirmation cascade.
+    # The caller triggers kanban_create directly.
+    direct_register: bool = False
+
     def inject_confirmation(self, base_response: str) -> str:
         """Return base_response with the confirmation prompt appended."""
         return base_response + CHITCHAT_CONFIRMATION_PROMPT
@@ -117,7 +122,7 @@ def chitchat_kanban_check(
 
     Detection flow:
       - If user says 'yes' while awaiting confirmation → clear state, no new prompt.
-      - If message is NOT chitchat → no monitoring (normal kanban flow applies).
+      - If message is NOT chitchat → flag direct_register=True, no monitoring needed.
       - If chitchat but no prior chitchat exchange → track seen, no prompt yet.
       - If chitchat AND prior chitchat exchange → run intent detection.
         - If intent found AND not yet prompted for this intent → prompt.
@@ -131,7 +136,8 @@ def chitchat_kanban_check(
 
     Returns:
         ChitchatKanbanVerdict with prompt_requested=True when the confirmation
-        prompt should be injected.
+        prompt should be injected, or direct_register=True when the message is
+        task-worthy and should be registered in kanban directly.
     """
     _init_chitchat_state(agent)
     verdict = ChitchatKanbanVerdict()
@@ -152,13 +158,13 @@ def chitchat_kanban_check(
             intent_hash=_intent_hash(pending["user_message"] if pending else "", pending["intent_reason"] if pending else ""),
         )
 
-    # ── Not chitchat: nothing to do ───────────────────────────────────────
+    # ── Not chitchat: task-worthy, register directly ────────────────────────
     if not is_chitchat(msg):
         # Reset chitchat seen flag when user sends a task message.
         agent._chitchat_seen = False
         agent._chitchat_awaiting_confirmation = False
         agent._chitchat_pending_intent = None
-        return verdict
+        return ChitchatKanbanVerdict(direct_register=True)
 
     # ── Chitchat path ───────────────────────────────────────────────────────
     if not agent._chitchat_seen:

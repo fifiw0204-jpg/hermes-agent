@@ -1,7 +1,7 @@
 """Unit tests for the chitchat-aware kanban flow (t_0fa1633b)."""
 
 import pytest
-from agent.chitchat_classifier import is_chitchat
+from agent.chitchat_classifier import is_chitchat, non_chitchat_register
 from agent.chitchat_intent_detector import (
     detect_tasklike_intent_sync,
     _detect_tasklike_intent_deterministic,
@@ -43,6 +43,34 @@ class TestIsChitchat:
         assert is_chitchat("ok") is True
         assert is_chitchat("cool") is True
         assert is_chitchat("great") is True
+
+
+# ── non_chitchat_register ────────────────────────────────────────────────────────
+
+class TestNonChitchatRegister:
+    def test_greeting_false(self):
+        """Greeting is chitchat → not registered directly."""
+        assert non_chitchat_register("hi") is False
+        assert non_chitchat_register("hello") is False
+        assert non_chitchat_register("你好") is False
+
+    def test_task_true(self):
+        """Task-worthy message → registered directly."""
+        assert non_chitchat_register("帮我写个脚本") is True
+        assert non_chitchat_register("fix the bug") is True
+        assert non_chitchat_register("帮我调查这个问题") is True
+
+    def test_valediction_false(self):
+        """Valediction is chitchat → not registered directly."""
+        assert non_chitchat_register("bye") is False
+        assert non_chitchat_register("goodbye") is False
+
+    def test_is_chitchat_alias(self):
+        """non_chitchat_register is exactly not is_chitchat."""
+        for msg in ("hi", "hello", "bye", "ok", "cool"):
+            assert non_chitchat_register(msg) is (not is_chitchat(msg))
+        for msg in ("fix the bug", "帮我写脚本", "create a task"):
+            assert non_chitchat_register(msg) is (not is_chitchat(msg))
 
 
 # ── _is_social_only ─────────────────────────────────────────────────────────────
@@ -252,6 +280,38 @@ class TestChitchatKanbanCheck:
         assert verdict.prompt_requested is False
         assert agent._chitchat_seen is False
         assert agent._chitchat_awaiting_confirmation is False
+
+    def test_non_chitchat_direct_register_true(self):
+        """Non-chitchat (task-worthy) message → direct_register=True."""
+        agent = FakeAgent()
+        _init_chitchat_state(agent)
+        verdict = chitchat_kanban_check(
+            agent=agent,
+            user_message="帮我写个脚本",
+            assistant_response="好的，写什么脚本？",
+            conversation_history=[],
+        )
+        assert verdict.prompt_requested is False
+        assert verdict.direct_register is True
+
+    def test_non_chitchat_kanban_flow_clears_all_chitchat_state(self):
+        """Non-chitchat resets all chitchat state AND sets direct_register."""
+        agent = FakeAgent()
+        _init_chitchat_state(agent)
+        agent._chitchat_seen = True
+        agent._chitchat_awaiting_confirmation = True
+        agent._chitchat_pending_intent = {"user_message": "之前的 pending"}
+        verdict = chitchat_kanban_check(
+            agent=agent,
+            user_message="fix the bug",
+            assistant_response="Which one?",
+            conversation_history=[],
+        )
+        assert verdict.direct_register is True
+        assert verdict.prompt_requested is False
+        assert agent._chitchat_seen is False
+        assert agent._chitchat_awaiting_confirmation is False
+        assert agent._chitchat_pending_intent is None
 
     def test_yes_confirmation_clears_pending(self):
         """User saying 'yes' should clear pending intent."""

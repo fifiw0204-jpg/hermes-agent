@@ -365,3 +365,15 @@ def chitchat_score(message: str) -> tuple[bool, float]:
 def is_chitchat(message: str) -> bool:
     """Return True if `message` is likely chitchat, False if task-related."""
     return chitchat_score(message)[0]
+
+
+def non_chitchat_register(message: str) -> bool:
+    """Return True when ``message`` is a task-worthy message that should be
+    registered in Hermes kanban WITHOUT requiring the chitchat-after-cascade
+    confirmation prompt.
+
+    This is a convenience alias for the most common non-chitchat decision:
+    ``not is_chitchat(message)``.  Callers who need the confidence score
+    should call ``chitchat_score()`` directly.
+    """
+    return not is_chitchat(message)

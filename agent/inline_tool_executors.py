@@ -200,6 +200,52 @@ def _chitchat_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
         ),
         task_id=lambda agent, ctx: ctx.effective_task_id,
     )
+
+
+def _direct_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
+    """Direct kanban task creation for non-chitchat (task-worthy) user messages.
+
+    Triggered by finish_text_response when chitchat_kanban_check returns
+    direct_register=True.  The message body carries the original user text.
+    The title is the first 100 chars of the user message.
+    """
+    msg = getattr(agent, "_last_direct_register_message", "") or ""
+    title = msg[:100] if msg else "Untitled task"
+    body = msg
+
+    resolved_args = {
+        "title": args.get("title") or title,
+        "body": args.get("body") or body,
+        "assignee": args.get("assignee") or "",
+        "priority": args.get("priority") or 0,
+        "workspace_kind": args.get("workspace_kind") or "",
+        "workspace_path": args.get("workspace_path") or "",
+        "completion_contract": args.get("completion_contract") or "",
+    }
+    # Apply any explicit overrides passed by the model call.
+    for key in ("title", "body", "assignee", "priority",
+                "workspace_kind", "workspace_path", "completion_contract",
+                "parent", "parents", "board", "project",
+                "skills", "goal_mode", "model", "provider",
+                "max_runtime_seconds", "initial_status"):
+        if key in args:
+            resolved_args[key] = args[key]
+
+    return _call_tool(
+        "tools.kanban_tools", "_handle_create", resolved_args,
+        (
+            ("title", "title"), ("body", "body"), ("assignee", "assignee"),
+            ("parent", "parent"), ("parents", "parents"), ("priority", "priority"),
+            ("board", "board"), ("workspace_kind", "workspace_kind"),
+            ("workspace_path", "workspace_path"), ("project", "project"),
+            ("skills", "skills"), ("goal_mode", "goal_mode"),
+            ("model", "model"), ("provider", "provider"),
+            ("max_runtime_seconds", "max_runtime_seconds"),
+            ("completion_contract", "completion_contract"),
+            ("initial_status", "initial_status"),
+        ),
+        task_id=lambda agent, ctx: ctx.effective_task_id,
+    )
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "todo_list": _tool(
@@ -249,6 +295,8 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "delegate_task": lambda agent, args, ctx: agent._dispatch_delegate_task(args),
     # Chitchat-aware kanban: auto-fills kanban_create with pending intent on 'yes' confirmation.
     "kanban_create": _chitchat_kanban_create,
+    # Direct kanban task creation for non-chitchat (task-worthy) user messages.
+    "direct_kanban_create": _direct_kanban_create,
 }
 
 
