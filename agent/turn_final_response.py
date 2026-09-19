@@ -166,6 +166,21 @@ def finish_text_response(
 
     final_response = agent._strip_think_blocks(final_response).strip()
 
+    # ── Chitchat-aware kanban intent detection ───────────────────────────────────
+    # After at least one chitchat exchange, check whether the conversation has
+    # revealed task-like intent. If so, inject the confirmation prompt.
+    # The 'yes' confirmation is handled by inline_tool_executors.py.
+    from agent.chitchat_kanban_flow import chitchat_kanban_check
+
+    _ckv = chitchat_kanban_check(
+        agent=agent,
+        user_message=user_message or "",
+        assistant_response=final_response,
+        conversation_history=messages,
+    )
+    if _ckv.prompt_requested:
+        final_response = _ckv.inject_confirmation(final_response)
+
     final_msg = agent._build_assistant_message(assistant_message, finish_reason)
 
     # Dropped tool-call recovery (copilot/Claude): finish_reason="tool_calls" with empty

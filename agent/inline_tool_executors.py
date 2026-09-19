@@ -149,6 +149,57 @@ def _desktop_preview(agent, args: dict, ctx: InlineToolContext) -> Any:
     return _handle_preview(args)
 
 
+def _manage_connections(agent, args: dict, ctx: InlineToolContext) -> Any:
+    # The GUI callback lives on the agent; registry dispatch never forwards it.
+    from tools.connectors import manage_connections
+    from tools.connectors.gateway import config as gateway_config
+
+    return manage_connections(
+        args, session_id=getattr(agent, "session_id", None), tool_call_id=ctx.tool_call_id,
+        connection_callback=getattr(agent, "connection_callback", None),
+        connectors_available=gateway_config.connectors_available,
+    )
+
+
+def _setup_mcp_shim(agent, args: dict, ctx: InlineToolContext) -> Any:
+    # Replay shim for conversations whose cached prompt still names setup_mcp.
+    # Not in _LEGACY_TOOL_ALIASES: inline tools bypass handle_function_call.
+    return _manage_connections(agent, {
+        "action": args.get("action", "install"),
+        "connectors": [{"name": args.get("server", ""), "mcp": True}],
+    }, ctx)
+
+
+def _chitchat_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
+    """Auto-fill kanban_create title from pending chitchat intent when user confirmed 'yes'.
+
+    Fires when the model calls ``kanban_create`` after the user confirmed the chitchat
+    intent prompt.
+    """
+    from agent.chitchat_kanban_flow import chitchat_kanban_confirmed_intent
+
+    pending = chitchat_kanban_confirmed_intent(agent)
+    if pending:
+        if not args.get("title"):
+            user_msg = pending.get("user_message", "")[:100]
+            args = dict(args)
+            args["title"] = f"[chitchat] {user_msg}"
+
+    return _call_tool(
+        "tools.kanban_tools", "_handle_create", args,
+        (
+            ("title", "title"), ("body", "body"), ("assignee", "assignee"),
+            ("parent", "parent"), ("parents", "parents"), ("priority", "priority"),
+            ("board", "board"), ("workspace_kind", "workspace_kind"),
+            ("workspace_path", "workspace_path"), ("project", "project"),
+            ("skills", "skills"), ("goal_mode", "goal_mode"),
+            ("model", "model"), ("provider", "provider"),
+            ("max_runtime_seconds", "max_runtime_seconds"),
+            ("completion_contract", "completion_contract"),
+            ("initial_status", "initial_status"),
+        ),
+        task_id=lambda agent, ctx: ctx.effective_task_id,
+    )
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "todo_list": _tool(
@@ -196,7 +247,10 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         ("server", "server", ""), ("action", "action", "install"), ("reason", "reason", ""),
     ),
     "delegate_task": lambda agent, args, ctx: agent._dispatch_delegate_task(args),
+    # Chitchat-aware kanban: auto-fills kanban_create with pending intent on 'yes' confirmation.
+    "kanban_create": _chitchat_kanban_create,
 }
+
 
 # ``invoke_tool`` (concurrent path) consults the memory manager right after these three
 # names and before the remaining inline tools; ``message_agent`` falls through to the
