@@ -26,23 +26,23 @@ logger = logging.getLogger("agent.chitchat_intent_detector")
 # CJK characters have no word boundaries so patterns are bare prefixes.
 _TASK_INTENT_KEYWORD_PATTERNS = [
     # Explicit work / action verbs (English + Chinese characters)
-    r"(?i)\b(write|build|fix|create|implement|debug|check|find|look\s+at|analyze|audit|refactor|test|run|do|delete|remove|update)\b",
-    r"(?i)(需要|想要|帮我|幫我|create|implement|delete|remove|update|写|創|建|建造|开发|開發|修复|修復|檢查|檢查|刪除|更新)",
+    r"\b(write|build|fix|create|implement|debug|check|find|look\s+at|analyze|audit|refactor|test|run|do|delete|remove|update)\b",
+    r"(需要|想要|帮我|幫我|create|implement|delete|remove|update|写|創|建|建造|开发|開發|修复|修復|檢查|檢查|刪除|更新)",
     # Explicit problem statements
-    r"(?i)\b(bug|issue|problem|broken|crash|error|fail|failing|not\s+working|doesn't\s+work|doesn't\s+exist)\b",
-    r"(?i)(bug|错误|錯誤|问题|問題|崩溃|崩潰|故障|失败|失敗)",
+    r"\b(bug|issue|problem|broken|crash|error|fail|failing|not\s+working|doesn't\s+work|doesn't\s+exist)\b",
+    r"(bug|错误|錯誤|问题|問題|崩溃|崩潰|故障|失败|失敗)",
     # Explicit task/todo framing
-    r"(?i)\b(todo|to.?do|task|ticket|kanban)\b",
-    r"(?i)(登记|登記|工作|任務|todo)",
+    r"\b(todo|to.?do|task|ticket|kanban)\b",
+    r"(登记|登記|工作|任務|todo)",
     # Explicit request patterns
-    r"(?i)\b(can\s+you|please|how\s+do\s+i|how\s+can\s+i|what'?s?\s+the|explain|show\s+me|give\s+me)\b",
-    r"(?i)(能不能|可不可以|帮我|幫我|请|請)",
+    r"\b(can\s+you|please|how\s+do\s+i|how\s+can\s+i|what'?s?\s+the|explain|show\s+me|give\s+me)\b",
+    r"(能不能|可不可以|帮我|幫我|请|請)",
     # Pain-point / complaint language
-    r"(?i)\b(hate|annoying|frustrat|tired\s+of|wish\s+it|could\s+you|should\s+add|should\s+be|improve|optimize)\b",
-    r"(?i)(自动化|自動|自动化|讨厌|討厭|烦|煩|希望|希望|应该|應該)\b",
+    r"\b(hate|annoying|frustrat|tired\s+of|wish\s+it|could\s+you|should\s+add|should\s+be|improve|optimize)\b",
+    r"(自动化|自動|自动化|讨厌|討厭|烦|煩|希望|应该|應該)",
     # Goal-oriented language
-    r"(?i)\b(goal|objective|plan|finish|complete|accomplish)\b",
-    r"(?i)(打算|计划|计划|目标|目標|想要完成|完成|實現)\b",
+    r"\b(goal|objective|plan|finish|complete|accomplish)\b",
+    r"(打算|计划|计划|目标|目標|想要完成|完成|實現)",
 ]
 _TASK_INTENT_RE = re.compile("|".join(_TASK_INTENT_KEYWORD_PATTERNS), re.IGNORECASE)
 
