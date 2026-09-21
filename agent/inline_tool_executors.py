@@ -185,6 +185,9 @@ def _chitchat_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
             args = dict(args)
             args["title"] = f"[chitchat] {user_msg}"
 
+    # Pass task_id as part of args dict so _handle_create receives it via **kw,
+    # not as a separate fixed= keyword arg that _call_tool can't route correctly.
+    args["task_id"] = ctx.effective_task_id
     return _call_tool(
         "tools.kanban_tools", "_handle_create", args,
         (
@@ -198,7 +201,6 @@ def _chitchat_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
             ("completion_contract", "completion_contract"),
             ("initial_status", "initial_status"),
         ),
-        task_id=lambda agent, ctx: ctx.effective_task_id,
     )
 
 
@@ -231,6 +233,7 @@ def _direct_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
         if key in args:
             resolved_args[key] = args[key]
 
+    resolved_args["task_id"] = ctx.effective_task_id
     return _call_tool(
         "tools.kanban_tools", "_handle_create", resolved_args,
         (
@@ -244,7 +247,6 @@ def _direct_kanban_create(agent, args: dict, ctx: InlineToolContext) -> Any:
             ("completion_contract", "completion_contract"),
             ("initial_status", "initial_status"),
         ),
-        task_id=lambda agent, ctx: ctx.effective_task_id,
     )
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
@@ -293,10 +295,6 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         ("server", "server", ""), ("action", "action", "install"), ("reason", "reason", ""),
     ),
     "delegate_task": lambda agent, args, ctx: agent._dispatch_delegate_task(args),
-    # Chitchat-aware kanban: auto-fills kanban_create with pending intent on 'yes' confirmation.
-    "kanban_create": _chitchat_kanban_create,
-    # Direct kanban task creation for non-chitchat (task-worthy) user messages.
-    "direct_kanban_create": _direct_kanban_create,
 }
 
 
