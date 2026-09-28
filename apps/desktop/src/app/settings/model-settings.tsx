@@ -645,7 +645,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile, subpage }: Mod
     setError('')
 
     try {
-      await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
+      await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile, { providerSetup: true })
       setApiKeyDraft('')
 
       // Pick a sensible default for the freshly-activated provider (mirrors
