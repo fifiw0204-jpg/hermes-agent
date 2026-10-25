@@ -48,6 +48,11 @@ existing line wrapping.
   asked.
 - **DELIVERABLES is the manifest.** Write the same paths, one per line, into a
   separate manifest file. That file is what `scripts/verify_artifacts.py` reads.
+- **VERIFY must assert the constraint that matters.** `VERIFY` should check the
+  thing CONSTRAINTS forbids. A VERIFY that only checks "the file exists and is
+  non-empty" passes a note that is three times over its line limit — and the
+  parent, reading only the child's summary, never notices. If CONSTRAINTS says
+  "under 40 lines", VERIFY must count lines.
 - **VERIFY must be runnable as-is.** A command the child can paste and execute
   without guessing paths. "Check that it works" is not a VERIFY line.
 - **One brief per child.** Children share no context. When dispatching parallel

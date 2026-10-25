@@ -107,8 +107,12 @@ systematic-debugging
 
 Budgets come from config, not from the call: `delegate_task` ignores a
 caller-supplied `max_iterations` and always uses `delegation.max_iterations`
-from `config.yaml` (default 250). To change the ceiling, edit config; do not
+from the config file (default 250). To change the ceiling, edit config; do not
 pass the argument and expect it to apply.
+
+The config file is `$HERMES_HOME/config.yaml` — normally `~/.hermes/config.yaml`,
+but a named profile repoints `HERMES_HOME`, so under a profile the profile's own
+`config.yaml` wins. Check which one you are editing.
 
 Dispatch parallel workstreams as separate entries in one `delegate_task` call.
 Give each entry a complete brief of its own — children share nothing.
@@ -127,6 +131,11 @@ python3 skills/autonomous-ai-agents/subagent-dispatch/scripts/verify_artifacts.p
 It prints one PASS/FAIL row per path and exits non-zero when anything is
 missing or empty. A child that reports "done" while leaving the deliverable
 missing is a failure, regardless of the wording in its summary.
+
+The manifest proves existence, not content. If the brief carried a constraint
+— a line limit, a size cap, a required heading — check that too, with the
+child's own `VERIFY` command. Existence plus a self-report is not
+verification.
 
 If the child is still running, steer it instead of waiting:
 
