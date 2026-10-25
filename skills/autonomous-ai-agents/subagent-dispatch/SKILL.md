@@ -92,11 +92,8 @@ recorded in the conversation and a scratch path survives the session.
 
 ### 3. Dispatch
 
-```bash
-# read the brief back so its exact text is what the child receives
-```
-
-Pass the brief text as `context` and the one-sentence outcome as `goal`.
+Read the brief file back and pass its exact text as `context`, with the
+one-sentence outcome as `goal`.
 Keep `goal` and the brief's GOAL line identical, so a parent reading only the
 result entry can still tell what was asked.
 
