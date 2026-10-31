@@ -65,6 +65,52 @@ def bound_interpreter_gone(conn, task_id):
     return not _worker_alive(bound.get('pid'), bound.get('started_at'))
 
 
+def managed_attempt_in_flight(conn, task_id) -> bool:
+    """True when the owner still holds an admitted, unsettled attempt for this task's run.
+
+    The owner's admission ledger is the authority on whether the attempt can still be
+    executing: ``status='started'`` means the owner took the turn and never settled it.
+    While that row says ``started``, the owner process is still the one that took the turn
+    (the same birth as the receipt) and the claim lease is still live, the attempt can still
+    be running — so a dead ``tasks.worker_pid`` is not evidence that it is not.
+
+    The dispatcher's spawned submitter exits by design once the owner admits the turn: the
+    run's ``worker_pid`` names that submitter, not the attempt, and the attempt then
+    continues inside the owner. Reading the pid as the attempt's liveness books a card
+    ``crashed`` while its session is still working — observed on card ``t_722fec79``, whose
+    runs 56 and 57 were both booked ``crashed`` while the admitted session kept calling the
+    model. The card was re-queued, ran again, and was auto-blocked after two crashes.
+
+    Missing evidence is never proof: no ``owner_admitted`` receipt, an unreadable ledger, an
+    admission that never started or has already settled, a recycled owner pid, and an
+    expired lease all return False, leaving the platform's own reclaim path in charge.
+    """
+    binding = _latest_run_event(conn, task_id, 'owner_admitted')
+    if not binding:
+        return False
+    try:
+        with closing(sqlite3.connect(Path(binding['db']).as_uri() + '?mode=ro', uri=True)) as owner:
+            row = owner.execute(
+                'SELECT status FROM session_admissions WHERE target_session_id=? AND request_id=?',
+                (binding['session_id'], binding['request_id'])).fetchone()
+    except (OSError, ValueError, KeyError, sqlite3.Error):
+        return False
+    if row is None or row[0] != 'started':
+        return False
+    from hermes_cli.process_identity import process_birth
+    try:
+        if process_birth(psutil.Process(int(binding['pid']))) != binding.get('birth'):
+            return False
+    except (KeyError, TypeError, ValueError, psutil.Error):
+        return False
+    task = conn.execute('SELECT claim_expires FROM tasks WHERE id=?', (task_id,)).fetchone()
+    if task is None:
+        return False
+    from hermes_cli import kanban_db as kb
+    expires = kb._to_epoch(task['claim_expires'])
+    return expires is not None and expires >= int(time.time())
+
+
 def _owner_process_gone(receipt) -> bool:
     """True when the receipt's own pid is gone, or its number now belongs to another process.
 
