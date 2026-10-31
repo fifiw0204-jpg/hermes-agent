@@ -1173,7 +1173,11 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             "WHERE status = 'running' AND worker_pid IS NOT NULL"
         ).fetchall()
         host_prefix = _kb._host_prefix()
-        from hermes_cli.kanban_owner_recovery import managed_run_exit_code, owner_reclaim_blocked
+        from hermes_cli.kanban_owner_recovery import (
+            managed_attempt_in_flight,
+            managed_run_exit_code,
+            owner_reclaim_blocked,
+        )
         for row in rows:
             lock = row["claim_lock"] or ""
             if not lock.startswith(host_prefix):
@@ -1188,6 +1192,13 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             # An ambiguous receipt holds the card while the attempt may still run; once nothing
             # can be executing it (a dead bound interpreter, or a run that never bound one): crash.
             if owner_reclaim_blocked(conn, row["id"], crash_sweep=True):
+                continue
+            # A managed run's submitter exits by design once the owner admits the turn; the
+            # attempt then lives in the owner's session, and the run's ``worker_pid`` names
+            # the submitter, not the attempt. While the owner still holds an admitted,
+            # unsettled attempt under a live lease, that dead pid is not evidence that the
+            # card is dead: booking it crashed re-queues work that is still running.
+            if managed_attempt_in_flight(conn, row["id"]):
                 continue
 
             pid = int(row["worker_pid"])
