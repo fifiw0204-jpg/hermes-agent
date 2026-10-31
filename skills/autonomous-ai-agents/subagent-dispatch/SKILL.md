@@ -49,6 +49,7 @@ second opinion on a risky change.
 | Steer / stop | `delegate_task` (`action=steer` / `action=stop`) | — |
 | Card path (board budget) | `references/kanban-card-dispatch.md` | board rows + run row + worker turn count |
 | External leaf CLI (pi/claude/codex) | `references/external-leaf-workers.md` | per-worker `out.json` + grader table |
+| Fresh-context reviewer fan-out | `references/reviewer-fanout.md` | one entry per reviewer, persona as file path |
 
 ## Procedure
 
@@ -325,6 +326,9 @@ work. It means the child does the work.
 ## Pitfalls
 
 - **Do not delegate trivia.** Two files and a one-line fix cost more to hand off than to do.
+- **Do not inline a long reviewer persona into the dispatch.** Put the persona in a file and pass its path in `context` with “read this first and adopt it”; the parent's context stays small and the persona stays versioned in one place. A persona pasted into `goal` is re-read and re-spent on every dispatch.
+- **Do not ask a child to spawn children.** A Hermes child has no `delegate_task`, so a nested-orchestration brief silently becomes a no-op — the parent fans out and merges instead.
+- **Do not count a failed reviewer as a reviewer with zero findings.** A child that errored, timed out, or returned nothing did not review; retry once, then mark it `not run` and say so in the report.
 - **Do not write an open-ended brief.** Without a stopping condition, a child widens scope until the batch stops converging.
 - **Do not put the whole repository in `context`.** Point at paths; the child has its own file tools.
 - **Do not expect the child to ask you anything.** No `clarify`, no `memory`, no `delegate_task` — anything unstated is assumed finished.
