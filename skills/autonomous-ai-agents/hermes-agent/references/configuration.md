@@ -17,6 +17,7 @@ Full reference: https://hermes-agent.nousresearch.com/docs/user-guide/configurat
 | `tts` | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts/gemini/piper/kittentts/deepinfra/xai) |
 | `memory` | `memory_enabled`, `user_profile_enabled`, `provider`, `write_approval` |
 | `security` | `redact_secrets`, `website_blocklist` |
+| `skills` | `external_dirs`, `create_dir` |
 | `delegation` | `model`, `provider`, `max_concurrent_children`, `max_iterations` (50), `max_spawn_depth` |
 | `checkpoints` | `enabled`, `max_snapshots` (50) |
 | `curator` | `enabled`, `consolidate` (false, opt-in aux-model consolidation), `interval_hours`, `stale_after_days` |
@@ -57,6 +58,46 @@ Full enumeration: `TOOLSETS` dict in `toolsets.py` (`_HERMES_CORE_TOOLS` is the 
 | `discord`, `discord_admin`, `feishu_doc`, `feishu_drive`, `yuanbao` | Service integrations (gated on their credentials). `homeassistant` (`ha_*` tools) and `spotify` (`spotify_*` tools) are not built in: they come from the `homeassistant` / `spotify` catalog plugins (`hermes plugins install <name>`) |
 
 Tool changes take effect on `/reset` (new session) — never mid-conversation, to preserve prompt caching.
+
+### Skills
+
+```yaml
+skills:
+  external_dirs:
+    - ~/some/repo/skills        # point at the directory that HOLDS skill dirs
+  create_dir: ~/.hermes/skills   # where new skills are written
+```
+
+`external_dirs` exposes a repo-owned skills tree without copying it: the
+loader reads it read-only at the lowest precedence tier (project > local >
+create_dir > external). A local skill shadows an external one of the same
+name; two same-named skills inside one external tree are refused as
+`Ambiguous skill name` rather than guessed at. Point the entry at the
+directory containing skill directories, not the repo root — a root-level
+entry makes the loader walk non-skill files too.
+
+The loader globs `SKILL.md` recursively, so a `SKILL.md` at the root of an
+exposed tree registers as a skill named after that root.
+
+After changing this, confirm through the catalog (`hermes skills list`) and
+rescan in a running session (`/reload-skills`); a session started before the
+change keeps its old catalog.
+
+Write it with `hermes config set skills.external_dirs '["/abs/path"]'` and
+then read the file back — a nested key can land outside the section you
+meant, and a misplaced list silently exposes nothing.
+
+`external_dirs` is per-profile config and every profile has its own config
+file, so a second profile needs its own entry: `hermes -p <profile> config
+set skills.external_dirs '[...]'`. Setting it on the default config does not
+reach the other profile.
+
+The exposed tree is read from disk on every scan, so the branch the target
+checkout is on decides which skills exist — switching that checkout's branch
+changes every profile's catalog. Re-run `hermes skills list` per profile
+after such a switch. A narrow terminal truncates the table's columns and
+silently hides names, so widen it before parsing:
+`COLUMNS=250 hermes skills list`.
 
 ## Voice
 

@@ -25,9 +25,19 @@ python3 scripts/check_docs.py docs/intro.md
 SKILL TO LOAD
 humanizer
 
+IN SCOPE
+docs/intro.md only.
+
+OUT OF SCOPE
+The billing service, the other pricing pages, and every other file.
+
 CONSTRAINTS
 Do not reformat other paragraphs. Do not add headings. Keep the file's
 existing line wrapping.
+
+STOP WHEN
+You have the v2 price confirmed and the paragraph rewritten. Do not
+investigate the billing service or the other pricing pages.
 ```
 
 ## Field rules
@@ -39,7 +49,10 @@ existing line wrapping.
 | DELIVERABLES | yes | One real path per line. These become the manifest you verify afterwards. |
 | VERIFY | yes | The exact command that proves the work landed. The child runs it; you re-run it. |
 | SKILL TO LOAD | no | A skill name. The child calls `skill_view` on it. Omit when no skill matches. |
+| IN SCOPE | no | The slice of work the child owns. Use when the repo has neighbouring areas a child could wander into. |
+| OUT OF SCOPE | no | The adjacent areas the child must not touch, read, or investigate. |
 | CONSTRAINTS | no | What not to touch, and what "done" excludes. |
+| STOP WHEN | no | The condition that ends the work, plus the questions the child should NOT chase. |
 
 ## Rules
 
@@ -58,6 +71,17 @@ existing line wrapping.
 - **One brief per child.** Children share no context. When dispatching parallel
   workstreams, each entry carries its own complete brief — do not write "same
   as above".
+- **Bound the investigation.** Without STOP WHEN, a child widens scope on its
+  own — reading adjacent subsystems, running the repo's whole test suite,
+  opening a second research thread — and the batch stops converging. Name the
+  boundary explicitly rather than waiting to steer.
+- **Name the scope slice.** IN SCOPE / OUT OF SCOPE tells the child which
+  surface it owns and which neighbours are off-limits, so it stops at the
+  boundary instead of the boundary being discovered by you mid-flight.
+- **A read-only brief says so in the imperative.** "Do not modify anything" is
+  prose a child can interpret loosely; "do not write, commit, push, check out,
+  or comment" is not. You still prove it afterwards with `git status --short`
+  and an unchanged branch list.
 - **No secrets.** The brief lands in the child's transcript and in the
   session log. Pass a path to a credential file, not the credential.
 
@@ -70,3 +94,4 @@ existing line wrapping.
 | No VERIFY | Child claims success on an unrun command | Give the exact command |
 | Whole-file paste | Context budget blown before work starts | Point at paths, don't paste |
 | Unanswered questions | Child invents an answer (no `clarify` tool) | Resolve ambiguity in the brief first |
+| No STOP WHEN | Child keeps widening the investigation until the batch stalls | State the boundary and the questions to leave alone |

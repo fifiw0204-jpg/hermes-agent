@@ -90,6 +90,7 @@ Profiles use `~/.hermes/profiles/<name>/` with the same layout. When a profile i
 |---|---|
 | **Anything not listed below — "can Hermes do X?", "how do I set up X?"** | **https://hermes-agent.nousresearch.com/docs/llms.txt** |
 | Bots that chat, run routines, or message each other; the Bots tab | docs: `/user-guide/bot-mode` |
+| A dedicated bot with its own persona/voice and its own skill set (SOUL.md + scoped skills + own credentials/cron), or how many bots to split one skill family into | `references/bot-profiles-and-persona.md` |
 | CLI commands, subcommands, flags, "how do I run X" | `references/cli-reference.md` |
 | In-session slash commands | `references/slash-commands.md` |
 | Provider setup, API keys, OAuth | `references/providers-and-models.md` |
@@ -97,6 +98,14 @@ Profiles use `~/.hermes/profiles/<name>/` with the same layout. When a profile i
 | AGENTS.md / .hermes.md / CLAUDE.md project rules | `references/project-context-files.md` |
 | Secret redaction, PII, approval modes, "reset permissions" | `references/security-privacy.md` |
 | Delegation, cron, curator, kanban | `references/background-systems.md` |
+| Auditing what is non-native in an install; resetting to shipped defaults; pruning leftovers | `references/environment-audit-and-pruning.md` (+ `scripts/verify-native-state.sh`) |
+| "What actually happened in that session?" — reconstructing a past session's real state (artifacts, commits, current numbers) instead of quoting its self-report | `references/session-state-reconstruction.md` |
+| "Where did that skill change go?" — installed copy vs source repo vs branch vs PR; recovering text dropped from the installed copy | `references/skill-change-provenance.md` |
+| "Will my skill survive a reinstall?" — what a fresh install rebuilds from, which source/branch to pin, why a live-only skill is not rebuildable | `references/skill-reinstall-survival.md` |
+| "Is this skills repo a mess?" — auditing a skills tree for loadability, index drift, overlap, and naming hygiene | skill `skill-tree-audit` |
+| Freeing disk space on the host; stale tool versions, build caches, old editor servers; "can this host host one more workload?" capacity verdict | `references/disk-space-reclamation.md` (+ `scripts/reclaim-disk-space.sh`, `scripts/trace-venv-wheel-deps.sh`) |
+| Clearing stale host logins/connections: old SSH sessions, orphaned editor servers, root console logins | `references/host-session-cleanup.md` (+ `scripts/inventory-host-sessions.sh`) |
+| "These directories don't belong here" — triaging stray home/repo dirs for liveness, redundancy, ownership | `references/host-directory-triage.md` |
 | MCP servers (add, catalog, `hermes mcp`) | `references/native-mcp.md` |
 | Webhook routes and event-driven runs | `references/webhooks.md` |
 | A custom theme/skin ("synthwave theme", "change the gold ●") | `references/themes.md` + `templates/skin.yaml` |
@@ -210,4 +219,83 @@ terminal(command="tmux new-session -d -s resumed 'hermes --resume 20260225_14305
 - **Message role alternation** — never two assistant or two user messages in a row; only `tool` results can repeat.
 - **Secrets in `.env`, settings in `config.yaml`** — never tell a user to put a non-credential setting in `.env`.
 - **Profile-safe paths** — `get_hermes_home()` in code, `$HERMES_HOME` when resolving paths in a session.
-- **Never hand-edit `config.yaml` for the user** — use `hermes config set KEY VAL`; a stray indent can corrupt the file and break the live gateway.
+- **Never hand-edit `config.yaml` for the user** — use `hermes config set KEY VAL`; a stray indent can corrupt the file and break the live gateway. (Exception: a wholesale reset regenerates the file from the shipped `cli-config.yaml.example` — see `references/environment-audit-and-pruning.md`.)
+- **A refused file write means read, then write — do not reword the payload.** The file tools refuse to overwrite a file whose current content has not been read in the same working context, and the refusal is about the read, not the text. Re-read the file, then write it. For a targeted edit, prefer the patch tool: it needs only the old/new span, so it does not burn a call re-reading a whole file, and it cannot clobber a concurrent edit. Never retry the same write with a reworded body hoping the guard reads it differently.
+- **Never end a turn on tool calls alone.** After a tool call, the turn continues with what the result showed: state what changed, what was verified, and what is still open. A turn that only contains tool calls reads as a stalled agent, and the user has to re-prompt to find out whether anything happened.
+
+## Standing rules for destructive / cleanup requests
+
+These hold for any "clean this up", "make it native", "free disk space" work.
+
+- **Back up before deleting anything.** Backups may hold `.env`, `auth.json`, and
+  config — `chmod 600` the archives and never echo secret values.
+- **Inventory first, delete second.** Produce the itemised list with sizes and a
+  safety verdict per item, then act on the tier that is unambiguously rebuildable
+  and hold anything carrying user data, credentials, conversation history, or
+  backups for explicit approval.
+- **A wholesale rebuild is not an edit.** Regenerating `config.yaml` from the
+  shipped example removes every user-added section, including `mcp_servers`
+  entries the user wants kept. Inventory the MCP servers before rebuilding.
+- **Restoring is part of cleanup.** When the user reverses a decision
+  ("keep X"), restore from the backup, re-verify end to end, and say plainly
+  that a running agent process still holds the old registry — new servers
+  register only in a new session.
+- **Verify with the agent's own surfaces**, not by inspecting files: `hermes
+  config check`, `hermes mcp list`, `hermes skills list`, `hermes plugins list`,
+  `hermes chat -q "..."` smoke test. Never report a change as live based on the
+  file being edited.
+- **Never delete conversation history** (`state.db`, `sessions/`, `logs/`) or the
+  OS layer (kernel, git, gh, system Python, SSH, editors).
+- **Identify the live session by PID ancestry, not by age or `who` output.**
+  Before killing any login/session on the host, walk the ancestor chain of your
+  own shell and keep that subtree; `who`/`w` under-report `notty` and editor
+  sessions. Root-owned login shells ignore a non-root `kill` (including `-9`)
+  and need `sudo -n kill -HUP`. Killing an editor server makes the client
+  auto-reconnect and respawn a fresh tree — expect a second wave and re-check.
+  See `references/host-session-cleanup.md`.
+- **Prove a directory is unused before deleting it, even when it looks
+  rebuildable.** `pgrep` under-reports; the hard probe is
+  `grep -l "<path>" /proc/[0-9]*/maps` — a mapped path means a live process
+  holds those files right now. This is what separates a stale editor server
+  from the one your open window is using, and it is why the agent's own
+  current venv must never be deleted just because it is large.
+- **Never restart or stop the gateway from a command that also signals
+  processes**, and never from inside the gateway's own session — it kills the
+  shell running it. Status checks only, in their own call. Inside a gateway
+  session the terminal tool's lifecycle guard REFUSES `hermes gateway
+  restart`/`stop` and any script or `systemd-run` wrapper that reaches them
+  (it walks referenced scripts), so do not spend calls hunting for a
+  workaround: check status, then tell the user to run
+  `hermes gateway restart` in a separate shell outside the gateway. See
+  `references/troubleshooting.md` → "Restarting the gateway".
+- **Separate process kills from filesystem deletes.** A blocked or unconsented
+  `rm -rf` must not abort cleanup that already succeeded, and a blocked delete
+  is never re-attempted in a reworded form.
+- **A directory that something points into is live, not stray.** Skill and
+  profile directories are often symlinks into a checkout or a git worktree, so
+  "obviously leftover" can be the actual serving path. Sweep symlinks and
+  `git worktree list` before calling a directory redundant, and remove a
+  worktree with `git worktree remove` — never `rm -rf`. See
+  `references/host-directory-triage.md`.
+- **"Don't change anything yet" means read-only, end to end.** When the user
+  says to leave the current state alone, every check is non-mutating — no
+  clone that alters a working tree, no `git fetch` that moves a ref, no
+  `sync`/`reset`/`install`/`backup` that writes state, no commit or push.
+  Put throwaway clones in a scratch directory, verify remote claims against
+  a fresh clone or the GitHub API rather than moving a local tracking ref,
+  and end with findings plus the options that are available *once* the user
+  gives the go-ahead. Do not treat "investigate" as "start with a small
+  change".
+- **A skill edit that exists only in the installed copy is unversioned.** Mirror
+  it into the source repo and commit before calling a skill update done — see
+  `references/skill-change-provenance.md`.
+- **The installed copy is not a rebuild path.** A reinstall rebuilds
+  `$HERMES_HOME/skills/` from a Git checkout, so a skill that lives only
+  under the installed copy is not reinstall-reproducible. Commit it into a
+  repo the installer actually clones before promising it survives — see
+  `references/skill-reinstall-survival.md`.
+
+Deep procedure: `references/environment-audit-and-pruning.md` (what is native,
+how to restore it), `references/skill-reinstall-survival.md` (what a reinstall
+rebuilds from) and `references/disk-space-reclamation.md` (what is big and
+rebuildable).

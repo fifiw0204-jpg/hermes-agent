@@ -165,6 +165,8 @@ Do not edit the implementation while acting as reviewer. Request changes and let
 - **Skipping prior rounds:** Re-review must confirm both the requested corrections and preservation of previously passing behavior.
 - **Using blockers for ordinary rework:** Correctable defects belong in `kanban_request_changes`; reserve `kanban_block` for genuine external blockers or human decisions.
 - **Completing without evidence:** Every approval summary must name the checks or artifacts actually inspected.
+- **Judging the deliverable on a stale premise:** A card often exists because someone believed a component was broken, missing, or unimplemented. That belief is the card's premise, and it decays — a merged upstream commit or a stale "BROKEN" note in the skill's own reference docs can make the premise false while the deliverable is judged against it. Before approving, re-derive the premise from the source and the commit history, not from the skill's documentation. If the premise was already fixed upstream, the card is stale and the verdict is "rewrite or close", not a code review.
+- **Skipping the workspace and base branch:** A deliverable that lands in a shared checkout, or built on a base branch that has drifted from the one the card assumes, can be correct in isolation and wrong in the repo. Check what the change was built on and where it lands before grading it.
 
 ## Verification
 

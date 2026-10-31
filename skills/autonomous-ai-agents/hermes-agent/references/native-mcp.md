@@ -187,6 +187,58 @@ If an MCP tool call fails, any credential-like patterns in the error message are
 - Bearer tokens
 - Generic `token=`, `key=`, `API_KEY=`, `password=`, `secret=` patterns
 
+## Verifying a stdio server without the agent
+
+`hermes mcp list` proves the *config* parses; it does not prove the server
+answers. To check a stdio server end-to-end, speak JSON-RPC to it directly:
+
+```bash
+python3 - <<'EOF'
+import json, os, subprocess, time
+env = dict(os.environ)
+for line in open(os.path.expanduser('~/.hermes/.env')):
+    if line.startswith('TYPESAFE_API_KEY='):        # never echo the value
+        env['TYPESAFE_API_KEY'] = line.split('=', 1)[1].strip().strip('"')
+p = subprocess.Popen(['/path/to/server', 'mcp'], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                     env=env, text=True)
+def send(o):
+    p.stdin.write(json.dumps(o) + '\n'); p.stdin.flush()
+send({"jsonrpc":"2.0","id":1,"method":"initialize",
+      "params":{"protocolVersion":"2024-11-05","capabilities":{},
+                "clientInfo":{"name":"probe","version":"1"}}})
+send({"jsonrpc":"2.0","method":"notifications/initialized","params":{}})
+send({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}})
+time.sleep(2)
+out = p.stdout.readline()
+while out.strip():
+    try:
+        d = json.loads(out)
+        if d.get('id') == 2:
+            print('TOOLS:', [t['name'] for t in d['result']['tools']]); break
+    except Exception: pass
+    out = p.stdout.readline()
+p.terminate()
+EOF
+```
+
+`initialize` → `notifications/initialized` → `tools/list` is the minimum
+sequence; a server that answers `tools/list` with the expected tool names is
+live and its credential env injection works.
+
+## Config references and env interpolation
+
+- `mcp_servers.<name>.env` values may use `${VAR}` to reference a variable from
+  `~/.hermes/.env` (e.g. `TYPESAFE_API_KEY: ${TYPESAFE_API_KEY}`) instead of
+  pasting the secret into `config.yaml`. Config holds settings, `.env` holds
+  secrets — keep it that way.
+- The stdio subprocess inherits a **filtered** environment; only the vars you
+  list under `env:` (plus the safe baseline) reach it. If a server authenticates
+  with a key in `.env`, it must be listed explicitly or the server starts but
+  every call fails.
+- Re-adding a server to `config.yaml` needs a **new agent process** to register
+  its tools — the client discovers at startup only, no hot-reload.
+
 ## Troubleshooting
 
 ### "MCP SDK not available -- skipping MCP tool discovery"

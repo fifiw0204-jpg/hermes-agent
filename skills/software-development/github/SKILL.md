@@ -29,12 +29,21 @@ starting that workflow, the body below only routes.
 | Branch, commit, open PR, watch CI, merge | `references/pr-workflow.md` |
 | Carry an ISSUE to a verified PR (full delivery loop) | `references/issue-to-pr.md` |
 | Review someone's PR: diffs, inline comments, verdict | `references/code-review.md` |
+| Audit a repo's whole open PR set: what each solves, conflicts, merge order | `references/pr-set-audit.md` |
 | Clone/create/fork repos, remotes, releases | `references/repo-management.md` |
+| Reconcile a diverged clone with `origin/main`, consolidate local branches into one PR, prune stale branches/worktrees | `references/local-repo-reconciliation.md` |
 
 Supporting assets: `scripts/gh-env.sh` + `scripts/git-credential-token.py`
 (auth helpers), `templates/` (PR bodies, bug report, feature request),
 `references/ci-troubleshooting.md`, `references/conventional-commits.md`,
 `references/github-api-cheatsheet.md`, `references/review-output-template.md`.
+
+When a repo has drifted — local `main` behind `origin/main`, local branches
+holding work that may already be upstream, stale worktrees — that is
+reconciliation, not a new PR: `references/local-repo-reconciliation.md`
+covers the classify-by-content, fast-forward, consolidate, prune sequence.
+Never delete a branch or worktree before its commits are proven covered by
+blob comparison against `origin/main` or the open PR branch.
 
 ## Core discipline (applies to every workflow)
 

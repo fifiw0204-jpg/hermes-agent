@@ -300,4 +300,5 @@ fi
 | `ssh: connect to host github.com port 22: Connection refused` | Try SSH over HTTPS port: add `Host github.com` with `Port 443` and `Hostname ssh.github.com` to `~/.ssh/config` |
 | Credentials not persisting | Check `git config --global credential.helper` — must be `store` or `cache` |
 | Multiple GitHub accounts | Use SSH with different keys per host alias in `~/.ssh/config`, or per-repo credential URLs |
-| `gh: command not found` + no sudo | Use git-only Method 1 above — no installation needed |
+| `gh: command not found` + no sudo | Use git-only Method 1 above (no installation needed) |
+| `gh` fails with `invalid header field value for "Authorization"` | The ambient `GH_TOKEN`/`GITHUB_TOKEN` is malformed and gh prefers it over the stored credential — `unset GH_TOKEN GITHUB_TOKEN` in that command's shell so gh falls back to the credential store / `~/.config/gh/hosts.yml`. The error names the header, not the token, so it reads like a gh bug; it is a bad env value. Never print the token to diagnose it. |

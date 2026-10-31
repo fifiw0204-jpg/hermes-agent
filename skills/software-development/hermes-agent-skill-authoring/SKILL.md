@@ -176,12 +176,25 @@ A skill exists to make the agent's process more predictable — the agent reliab
 6. **Git add + commit** on the active branch; open a PR.
 7. **Note:** the CURRENT session's skill loader is cached — `skill_view` / `skills_list` will not see the new skill until a new session. This is expected, not a bug.
 
+## Ports Between Repos
+
+When a skill is adapted from another repository into this one, the two
+versions are separate artifacts with separate names. The port gets its own
+branch in the repo that will hold the merged change — and only that repo.
+Do not leave a second branch lying on a fork "because the work started
+there"; a stray branch is indistinguishable from intent to a reader.
+
+Give the port a name that says how it differs from the source ("v2",
+"hermes port", "adds X"). The `name` frontmatter field is what the loader
+keys on, so two skills sharing a name means one silently shadows the other.
+
 ## Editing Existing In-Repo Skills
 
 - **Small fix:** `skill_manage(action='patch', ...)` works on in-repo skills, as does `patch`.
 - **Major rewrite:** `write_file` the whole SKILL.md.
 - **Supporting files:** `write_file` to `references/`, `templates/`, or `scripts/` under the skill dir.
 - **Always commit** — in-repo skills are source, not runtime state. Re-run the docs generator when frontmatter changed.
+- **A `skill_manage` patch on a bundled skill edits the *installed* copy, not the repo.** A bundled skill exists twice: `~/.hermes/hermes-agent/skills/<cat>/<name>/` (source) and `~/.hermes/skills/<cat>/<name>/` (what the loader reads). `skill_manage` writes the installed one. For a change to ship, mirror it into the repo tree, commit, and push — otherwise it is unversioned runtime state that the next update overwrites. The `hermes-agent` skill's reference `skill-change-provenance.md` has the four-home drift audit (installed copy, source repo, branch, remote/PR) and how to recover text dropped from the installed copy.
 
 ## Common Pitfalls
 
@@ -195,6 +208,9 @@ A skill exists to make the agent's process more predictable — the agent reliab
 8. **Skipping the docs generator or pushing its unrelated drift.** Both directions are wrong: no regen = orphan skill with no docs page; blind regen = a ballooned diff full of other skills' drift.
 9. **Expecting the current session to see the new skill.** The loader is initialized at session start.
 10. **Letting skills accumulate sediment.** When adding a rule, remove the old wording it replaces.
+11. **Scattering a port across repos.** One port, one branch, one repo — the one that owns the merged change. Confirm the remote before the first push.
+12. **Reusing the source skill's name for the port.** The loader keys on `name`; a collision shadows the skill that already exists.
+13. **Stopping at "git push".** Committed and pushed is not submitted — `gh pr list` on the target repo is what proves a reviewer can see the work.
 
 ## Verification Checklist
 
@@ -212,3 +228,4 @@ A skill exists to make the agent's process more predictable — the agent reliab
 - [ ] Tests at `tests/skills/test_<skill>_skill.py` pass under `scripts/run_tests.sh`
 - [ ] Docs regenerated with scope discipline; sidebar has exactly one entry for the slug
 - [ ] `git add` + commit on the intended branch; PR opened
+- [ ] If this skill was ported from another repo: distinct `name` from the source, and the branch exists only in the repo that owns the merge

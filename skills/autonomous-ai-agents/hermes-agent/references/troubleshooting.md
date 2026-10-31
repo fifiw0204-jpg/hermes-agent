@@ -60,6 +60,21 @@ grep -i "failed to send\|error" ~/.hermes/logs/gateway.log | tail -20
 ```
 
 Common gateway problems:
+- **Restarting the gateway**: `hermes gateway restart` is the supported
+  command. Run it from a shell OUTSIDE the gateway process. When the session
+  itself is served by the gateway (a gateway-hosted chat, or any CLI whose
+  terminal runs under `hermes-gateway.service`), the terminal tool's
+  lifecycle guard refuses the command — including wrapped forms such as
+  `systemd-run --user … systemctl --user restart hermes-gateway` or a
+  `.service` file that execs the restart, because the guard also scans
+  referenced scripts. Do not keep re-rolling the command: check status
+  (`hermes gateway status`), then hand the exact command back to the user to
+  run in a separate shell.
+- **Compact status check**: `hermes gateway status` prints the full systemd
+  cgroup tree (every child process and its argv) and can flood context.
+  Prefer `systemctl --user is-active hermes-gateway` for a one-line answer,
+  and `systemctl --user show hermes-gateway -p ActiveState -p MainPID -p
+  ExecMainStartTimestamp` for PID/uptime.
 - **Gateway dies on SSH logout**: Enable linger: `sudo loginctl enable-linger $USER`
 - **Gateway dies on WSL2 close**: WSL2 requires `systemd=true` in `/etc/wsl.conf` for systemd services to work. Without it, gateway falls back to `nohup` (dies when session closes).
 - **Gateway crash loop**: Reset the failed state: `systemctl --user reset-failed hermes-gateway`

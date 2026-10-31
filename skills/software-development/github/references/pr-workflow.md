@@ -62,6 +62,41 @@ Branch naming conventions:
 - `docs/description` — documentation
 - `ci/description` — CI/CD changes
 
+Some repos impose their own shape (e.g. `fix/<SKILL-ID>-<slug>` keyed to
+an issue or a record ID). Read the repo's `AGENTS.md` / `CONTRIBUTING` before
+inventing a name; the existing branch list in that repo is the best guide.
+
+### Check the current branch before you commit on it
+
+The checked-out branch is not automatically the right branch for the work
+in hand:
+
+```bash
+git branch --show-current
+git log --oneline origin/main..HEAD          # commits this branch already adds
+gh pr list --state open --json number,title,headRefName
+```
+
+- Branch already has an open PR and the change belongs to it -> commit on
+  that branch.
+- Branch has an open PR and the change is **unrelated** -> the new commits
+  land in that PR's diff and pollute it. Rebasing cannot remove them; only a
+  fresh branch can. Branch a worktree from `origin/main` and make the change
+  there:
+
+  ```bash
+  git worktree add .worktrees/<slug> -b fix/<slug> origin/main
+  # copy only the changed files in, then prove the tree matches the source
+  diff -q <original.patch> <worktree>/worktree.patch
+  ```
+
+  Keep the primary working tree on its original branch: anything symlinked
+  into it (live skill directories, profile skill dirs) keeps resolving, and
+  switching the primary branch breaks those links.
+
+- Branch is behind `origin/main` -> rebase first. A PR from a stale base
+  shows unrelated churn in its diff and can conflict at merge time.
+
 ## 2. Making Commits
 
 Use the agent's file tools (`write_file`, `patch`) to make changes, then commit:
@@ -95,6 +130,32 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `ci`, `chore`, `perf`
 ```bash
 git push -u origin HEAD
 ```
+
+### Push to a fork, not upstream
+
+Upstream rejects a push you do not have write access to (403), and the
+failure happens after the work is done. When the repo you cloned is not
+yours, push to your fork and open the PR from the fork:
+
+```bash
+# origin is upstream: add your fork as a second remote and push there
+git remote add fork https://github.com/<you>/<repo>.git
+git push -u fork HEAD
+# then open the PR against upstream from the fork's branch
+gh pr create --repo <upstream-owner>/<repo> --head <you>:<branch> --base main
+```
+
+Check `git remote -v` before the first push to confirm which remote `origin`
+points at. A push that lands on the wrong remote has to be undone by
+someone else.
+
+### One change, one branch, one repo
+
+A piece of work gets one branch, in the repository that will hold the merged
+change. Do not leave the same change staged as a branch on several remotes or
+repos: an extra branch on a fork reads as unfinished intent to anyone who
+sees it, and the user has to figure out which one is real. Push the branch
+where it belongs, and push elsewhere only when the user names that target.
 
 ### Create the PR
 
@@ -261,7 +322,22 @@ When asked to auto-fix CI, follow this loop:
 5. Wait for CI → re-check status
 6. Repeat if still failing (up to 3 attempts, then ask the user)
 
+### Merge only when the merge is yours to make
+
+Merging is a human action in most repos: the repo's `AGENTS.md` or
+`CONTRIBUTING` often forbids CLI merges (`gh pr merge`) precisely because a
+CLI merge bypasses the PR-event CI pipeline that the merge button triggers.
+Read the repo's rule before merging, and when the rule says "merge via the
+web UI", open the PR, report its URL and its pending checks, and stop.
+
+The user may also say "only handle the current one, ignore the other open
+PRs" — that means do not open, close, comment on, or audit the others;
+mention them at most as one line of context.
+
 ## 6. Merging
+
+Only where the repo's rules allow a CLI merge. When they do not, the
+commands below are wrong for that repo and the deliverable is the open PR.
 
 **With gh:**
 
